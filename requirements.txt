@@ -1,0 +1,13 @@
+# sh0rtifier - Dependencies
+# Note: Use `uv add <package>` to install, not `pip install`
+
+# Core video processing
+moviepy>=1.0.3
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# CLI enhancements (optional but recommended)
+tqdm>=4.65.0
+
+# GUI (built-in with Python, no install needed)
+# tkinter comes with Python
