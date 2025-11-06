@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "moviepy>=1.0.3",
+    "moviepy==1.0.3",
     "opencv-python>=4.8.0",
     "numpy>=1.24.0",
     "tqdm>=4.65.0",
