@@ -115,7 +115,7 @@ Choose your approach:
 ```bash
 # Installation
 uv sync                          # Install dependencies
-uv sync --extra dev              # Include dev tools
+uv sync --group dev              # Include dev tools
 
 # Running
 uv run python src/gui.py         # GUI interface
@@ -124,7 +124,7 @@ uv run python src/cli.py         # CLI interface
 # Development
 uv run pytest tests/ -v          # Run tests
 uv run black src/ tests/         # Format code
-uv run flake8 src/ tests/        # Lint code
+uv run ruff check src/ tests/    # Lint code
 
 # Package Management
 uv add <package>                 # Add dependency
@@ -178,7 +178,7 @@ git clone https://github.com/sl0thm4n/sh0rtifier.git
 cd sh0rtifier
 
 # Setup development environment
-uv sync --extra dev
+uv sync --group dev
 
 # Make your changes
 # ... edit files ...
@@ -203,7 +203,7 @@ Built with:
 - [MoviePy](https://zulko.github.io/moviepy/) - Video editing
 - [OpenCV](https://opencv.org/) - Image processing
 - [uv](https://github.com/astral-sh/uv) - Fast Python package manager
-- [tkinter](https://docs.python.org/3/library/tkinter.html) - GUI framework
+- [PyQt6](https://doc.qt.io/qtforpython-6/) - GUI framework
 
 ## 💬 Support
 
