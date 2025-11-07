@@ -1,6 +1,6 @@
 [project]
 name = "sh0rtifier"
-version = "0.1.0-dev0"
+version = "1.0.0-dev0"
 description = "Convert 16:9 videos to YouTube Shorts format (9:16)"
 authors = [
     {name = "sl0thm4n", email = "thesl0thm4n@gmail.com"}
@@ -173,7 +173,7 @@ exclude_lines = [
 ]
 
 [tool.bumpversion]
-current_version = "0.1.0-dev0"
+current_version = "1.0.0-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

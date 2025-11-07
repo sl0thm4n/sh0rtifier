@@ -490,7 +490,7 @@ class ShortsConverterGUI(QMainWindow):
             self,
             "About sh0rtifier",
             "<h2>sh0rtifier</h2>"
-            "<p>Version 0.1.0-dev0</p>"
+            "<p>Version 1.0.0-dev0</p>"
             "<p>Convert 16:9 videos to 9:16 YouTube Shorts (max 60s)</p>"
             "<p>© 2025 sl0thm4n</p>"
             "<p><a href='https://github.com/sl0thm4n/sh0rtifier'>GitHub</a></p>",
