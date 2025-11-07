@@ -106,7 +106,7 @@ Initial release of sh0rtifier
 
 📦 Downloads:
 - Windows: sh0rtifier.exe
-- macOS: sh0rtifier.app  
+- macOS: sh0rtifier.app
 - Linux: sh0rtifier (binary)
 
 Install from source: uv sync && uv run python src/gui.py"
@@ -115,7 +115,7 @@ Install from source: uv sync && uv run python src/gui.py"
 git push origin v1.0.0
 ```
 
-GitHub Actions will automatically build executables! 
+GitHub Actions will automatically build executables!
 Check the "Actions" tab after pushing the tag.
 
 ## ⚙️ Configure Repository Settings

@@ -1,0 +1,114 @@
+name: PR CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} - Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run pytest with all plugins
+        run: uv run pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing --black --isort --mypy --ruff
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  quality:
+    name: Code Quality (Detailed)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Check formatting with black
+        run: uv run black --check --diff src/ tests/
+        continue-on-error: true
+
+      - name: Check import sorting with isort
+        run: uv run isort --check-only --diff src/ tests/
+        continue-on-error: true
+
+      - name: Lint with ruff
+        run: uv run ruff check src/ tests/
+        continue-on-error: true
+
+      - name: Type check with mypy
+        run: uv run mypy src/ --ignore-missing-imports
+        continue-on-error: true
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [test, quality]
+    if: always()
+
+    steps:
+      - name: Check results
+        run: |
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Test status: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Quality status: ${{ needs.quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "::error::Tests failed"
+            echo "❌ Tests failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          if [ "${{ needs.quality.result }}" != "success" ]; then
+            echo "::warning::Code quality issues found"
+            echo "⚠️ Code quality issues found (not blocking)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "✅ All required checks passed!" >> $GITHUB_STEP_SUMMARY

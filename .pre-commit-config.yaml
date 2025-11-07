@@ -1,0 +1,43 @@
+# Pre-commit hooks for sh0rtifier (Simple version)
+# Install: uv run pre-commit install
+# Run manually: uv run pre-commit run --all-files
+
+default_language_version:
+  python: python3  # Use whatever Python is available
+
+repos:
+  # Black - Code formatting
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        args: ['--line-length=100']
+
+  # isort - Import sorting
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ['--profile=black', '--line-length=100']
+
+  # Ruff - Fast Python linter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: ['--fix']
+      - id: ruff-format  # Ruff's formatter (alternative to black)
+
+  # Built-in hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=10000']
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: mixed-line-ending
+        args: ['--fix=lf']
