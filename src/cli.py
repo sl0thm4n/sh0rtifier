@@ -7,7 +7,7 @@ Command-line interface for converting videos to YouTube Shorts format.
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 try:
     from tqdm import tqdm
@@ -18,10 +18,7 @@ from core import (
     ConversionOptions,
     ProcessingError,
     ValidationError,
-    auto_convert,
-    convert_segment,
     convert_to_shorts,
-    convert_with_speed,
     get_video_info,
 )
 
@@ -29,7 +26,7 @@ from core import (
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 
 
-def find_videos(folder: Path) -> List[Path]:
+def find_videos(folder: Path) -> list[Path]:
     """
     Find all video files in folder
 
@@ -50,7 +47,7 @@ def find_videos(folder: Path) -> List[Path]:
     return sorted(videos)
 
 
-def paginate_list(items: List, page_size: int = 10) -> List[List]:
+def paginate_list(items: list, page_size: int = 10) -> list[list]:
     """
     Split list into pages
 
@@ -100,8 +97,8 @@ def select_video_interactive(input_folder: Path) -> Optional[Path]:
                 duration_str = f"{info.duration:.1f}s"
                 size_str = f"{video.stat().st_size / 1024 / 1024:.1f}MB"
                 print(f"[{idx:2d}] {video.name:<40} {duration_str:>8} {size_str:>10}")
-            except:
-                print(f"[{idx:2d}] {video.name}")
+            except (ValidationError, ProcessingError, OSError) as e:
+                print(f"[{idx:2d}] {video.name:<40} (error: {e})")
 
         print(f"\n{'='*60}")
         if len(pages) > 1:
@@ -194,9 +191,7 @@ def get_conversion_options_interactive(video_info) -> ConversionOptions:
                 duration = float(input("Duration (seconds, max 60): ").strip())
 
                 if start < 0 or start >= video_info.duration:
-                    print(
-                        f"❌ Start time must be between 0 and {video_info.duration:.1f}"
-                    )
+                    print(f"❌ Start time must be between 0 and {video_info.duration:.1f}")
                     continue
 
                 if duration <= 0 or duration > 60:
@@ -204,7 +199,7 @@ def get_conversion_options_interactive(video_info) -> ConversionOptions:
                     continue
 
                 if start + duration > video_info.duration:
-                    print(f"❌ Segment exceeds video length")
+                    print("❌ Segment exceeds video length")
                     continue
 
                 options = ConversionOptions(start_time=start, duration=duration)
@@ -237,16 +232,16 @@ def main():
 Examples:
   # Interactive mode (default)
   python cli.py
-  
+
   # Specify input and output folders
   python cli.py --input ./videos --output ./shorts
-  
+
   # Convert specific file with auto speed
   python cli.py --file video.mp4 --output ./shorts
-  
+
   # Convert with specific speed
   python cli.py --file video.mp4 --speed 1.5
-  
+
   # Convert specific segment
   python cli.py --file video.mp4 --start 30 --duration 45
         """,
@@ -260,9 +255,7 @@ Examples:
         help="Input folder containing videos (default: current folder)",
     )
 
-    parser.add_argument(
-        "--output", "-o", type=str, help="Output folder (default: same as input)"
-    )
+    parser.add_argument("--output", "-o", type=str, help="Output folder (default: same as input)")
 
     parser.add_argument("--file", "-f", type=str, help="Specific video file to convert")
 
@@ -270,9 +263,7 @@ Examples:
         "--speed", "-s", type=float, help="Speed multiplier (e.g., 1.5 for 1.5x speed)"
     )
 
-    parser.add_argument(
-        "--start", type=float, help="Start time in seconds (for segment mode)"
-    )
+    parser.add_argument("--start", type=float, help="Start time in seconds (for segment mode)")
 
     parser.add_argument(
         "--duration", "-d", type=float, help="Duration in seconds (for segment mode)"

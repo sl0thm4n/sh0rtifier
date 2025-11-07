@@ -20,7 +20,7 @@ git commit -m "Initial commit: sh0rtifier v1.0.0
 
 Features:
 - Convert 16:9 videos to 9:16 YouTube Shorts format
-- Automatic 60-second limit enforcement  
+- Automatic 60-second limit enforcement
 - Speed adjustment for long videos
 - Segment selection for precise cuts
 - CLI and GUI interfaces

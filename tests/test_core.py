@@ -10,12 +10,7 @@ import pytest
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from core import (
-    ConversionOptions,
-    ProcessingError,
-    ValidationError,
-    VideoInfo,
-)
+from core import ConversionOptions, VideoInfo
 
 TEST_CLIP = "data/test.mp4"
 

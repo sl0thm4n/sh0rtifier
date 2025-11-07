@@ -1,486 +1,222 @@
 """
-sh0rtifier - Core Logic (MVP)
-
-This module handles video conversion from 16:9 to 9:16 with 60-second limit.
+Unit tests for sh0rtifier core functionality
 """
 
-import logging
-from dataclasses import dataclass
+import sys
 from pathlib import Path
-from typing import Callable, Optional, Tuple
 
-import cv2
-import numpy as np
-from moviepy.editor import VideoFileClip, vfx
+import pytest
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-
-class ShortsError(Exception):
-    """Base exception for Shorts Maker"""
-
-    pass
+from core import ConversionOptions, VideoInfo
 
 
-class ValidationError(ShortsError):
-    """Validation error"""
+class TestVideoInfo:
+    """Test VideoInfo dataclass"""
 
-    pass
-
-
-class ProcessingError(ShortsError):
-    """Video processing error"""
-
-    pass
-
-
-@dataclass
-class VideoInfo:
-    """Video file information"""
-
-    path: Path
-    duration: float
-    width: int
-    height: int
-    fps: float
-    has_audio: bool
-
-    @property
-    def is_short(self) -> bool:
-        """Check if video is under 60 seconds"""
-        return self.duration < 60.0
-
-    @property
-    def aspect_ratio(self) -> float:
-        """Calculate aspect ratio"""
-        return self.width / self.height if self.height > 0 else 0
-
-    @property
-    def is_landscape(self) -> bool:
-        """Check if video is landscape (16:9-ish)"""
-        return self.width > self.height
-
-
-@dataclass
-class ConversionOptions:
-    """Options for video conversion"""
-
-    # Segment selection (for videos over 60 seconds)
-    start_time: float = 0.0
-    duration: Optional[float] = None  # None means until the end
-
-    # Speed multiplier (alternative to segment selection)
-    speed: float = 1.0
-
-    # Output settings
-    target_width: int = 1080
-    target_height: int = 1920
-    output_bitrate: str = "8000k"
-    output_fps: int = 30
-
-    # Visual effects
-    blur_kernel: int = 99
-    blur_sigma: int = 80
-    blur_brightness: float = 0.6
-    blur_darken: int = -50
-
-    video_fadeout: float = 1.0
-    audio_fadeout: float = 3.0
-
-    def calculate_output_duration(self, original_duration: float) -> float:
-        """
-        Calculate the final output duration
-
-        Args:
-            original_duration: Original video duration in seconds
-
-        Returns:
-            Expected output duration in seconds
-        """
-        if self.duration is not None:
-            # Segment mode: use specified duration
-            actual_duration = min(self.duration, original_duration - self.start_time)
-        else:
-            # Speed mode: use full duration from start_time
-            actual_duration = original_duration - self.start_time
-
-        # Apply speed
-        return actual_duration / self.speed
-
-    def validate(self, video_info: VideoInfo) -> Tuple[bool, Optional[str]]:
-        """
-        Validate conversion options
-
-        Args:
-            video_info: Video information
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
-        # Videos under 60 seconds are always OK
-        if video_info.is_short:
-            return True, None
-
-        # For videos over 60 seconds
-        if self.start_time < 0:
-            return False, "Start time must be 0 or greater"
-
-        if self.start_time >= video_info.duration:
-            return (
-                False,
-                f"Start time exceeds video duration ({video_info.duration:.1f}s)",
-            )
-
-        if self.speed <= 0:
-            return False, "Speed must be greater than 0"
-
-        # Check segment duration if specified
-        if self.duration is not None:
-            if self.duration <= 0:
-                return False, "Duration must be greater than 0"
-
-            if self.start_time + self.duration > video_info.duration:
-                return False, "Selected segment exceeds video duration"
-
-        # Check final output duration
-        output_duration = self.calculate_output_duration(video_info.duration)
-        if output_duration > 60.0:
-            return (
-                False,
-                f"Output duration ({output_duration:.1f}s) exceeds 60 seconds limit",
-            )
-
-        return True, None
-
-
-def get_video_info(video_path: Path) -> VideoInfo:
-    """
-    Extract video information
-
-    Args:
-        video_path: Path to video file
-
-    Returns:
-        VideoInfo object
-
-    Raises:
-        ProcessingError: If video cannot be read
-    """
-    try:
-        clip = VideoFileClip(str(video_path))
-        info = VideoInfo(
-            path=video_path,
-            duration=clip.duration,
-            width=clip.w,
-            height=clip.h,
-            fps=clip.fps,
-            has_audio=clip.audio is not None,
+    def test_is_short_under_60(self):
+        """Test is_short property for videos under 60 seconds"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=45.0, width=1920, height=1080, fps=30.0, has_audio=True
         )
-        clip.close()
-        return info
-    except Exception as e:
-        raise ProcessingError(f"Failed to read video info: {str(e)}")
+        assert video.is_short is True
+
+    def test_is_short_over_60(self):
+        """Test is_short property for videos over 60 seconds"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=90.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        assert video.is_short is False
+
+    def test_is_short_exactly_60(self):
+        """Test is_short property for videos exactly 60 seconds"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=60.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        assert video.is_short is False
+
+    def test_aspect_ratio(self):
+        """Test aspect ratio calculation"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=45.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        assert video.aspect_ratio == pytest.approx(16 / 9, rel=0.01)
+
+    def test_is_landscape(self):
+        """Test landscape detection"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=45.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        assert video.is_landscape is True
+
+        portrait_video = VideoInfo(
+            path=Path("test.mp4"), duration=45.0, width=1080, height=1920, fps=30.0, has_audio=True
+        )
+        assert portrait_video.is_landscape is False
 
 
-def create_blur_background(
-    frame: np.ndarray,
-    target_width: int,
-    target_height: int,
-    blur_kernel: int,
-    blur_sigma: int,
-    brightness: float,
-    darken: int,
-) -> np.ndarray:
-    """
-    Create blurred background for vertical video
+class TestConversionOptions:
+    """Test ConversionOptions dataclass"""
 
-    Args:
-        frame: Input frame
-        target_width: Target width (1080)
-        target_height: Target height (1920)
-        blur_kernel: Gaussian blur kernel size
-        blur_sigma: Gaussian blur sigma
-        brightness: Brightness multiplier
-        darken: Brightness offset
+    def test_calculate_output_duration_with_speed(self):
+        """Test output duration calculation with speed adjustment"""
+        options = ConversionOptions(speed=2.0)
+        output = options.calculate_output_duration(120.0)
+        assert output == 60.0
 
-    Returns:
-        Blurred background frame
-    """
-    # Resize to target size (stretched)
-    bg = cv2.resize(frame, (target_width, target_height))
+    def test_calculate_output_duration_with_segment(self):
+        """Test output duration calculation with segment"""
+        options = ConversionOptions(duration=30.0)
+        output = options.calculate_output_duration(120.0)
+        assert output == 30.0
 
-    # Apply Gaussian blur
-    if blur_kernel > 0:
-        kernel_size = blur_kernel if blur_kernel % 2 == 1 else blur_kernel + 1
-        bg = cv2.GaussianBlur(bg, (kernel_size, kernel_size), blur_sigma)
+    def test_calculate_output_duration_segment_and_speed(self):
+        """Test output duration with both segment and speed"""
+        options = ConversionOptions(duration=60.0, speed=2.0)
+        output = options.calculate_output_duration(120.0)
+        assert output == 30.0
 
-    # Adjust brightness
-    bg = cv2.convertScaleAbs(bg, alpha=brightness, beta=darken)
-
-    return bg
-
-
-def apply_vertical_layout(
-    frame: np.ndarray,
-    target_width: int,
-    target_height: int,
-    blur_kernel: int,
-    blur_sigma: int,
-    brightness: float,
-    darken: int,
-) -> np.ndarray:
-    """
-    Apply 9:16 vertical layout with blurred background
-
-    Args:
-        frame: Input frame
-        target_width: Target width
-        target_height: Target height
-        blur_kernel: Blur kernel size
-        blur_sigma: Blur sigma
-        brightness: Background brightness
-        darken: Background darken amount
-
-    Returns:
-        Processed frame in 9:16 format
-    """
-    h, w = frame.shape[:2]
-
-    # Create blurred background
-    result = create_blur_background(
-        frame, target_width, target_height, blur_kernel, blur_sigma, brightness, darken
-    )
-
-    # Resize main video (fit width, maintain aspect ratio)
-    scale = target_width / w
-    new_width = target_width
-    new_height = int(h * scale)
-    resized = cv2.resize(frame, (new_width, new_height))
-
-    # Center vertically
-    if new_height <= target_height:
-        y_offset = (target_height - new_height) // 2
-        result[y_offset : y_offset + new_height, 0:target_width] = resized
-    else:
-        # If taller than target, crop from center
-        crop_y = (new_height - target_height) // 2
-        result[:, :] = resized[crop_y : crop_y + target_height, :]
-
-    return result
-
-
-def convert_to_shorts(
-    video_path: Path,
-    output_path: Path,
-    options: Optional[ConversionOptions] = None,
-    progress_callback: Optional[Callable[[float], None]] = None,
-) -> Path:
-    """
-    Convert 16:9 video to 9:16 YouTube Shorts format
-
-    Args:
-        video_path: Input video path
-        output_path: Output video path
-        options: Conversion options (uses defaults if None)
-        progress_callback: Callback function for progress updates (0-100)
-
-    Returns:
-        Path to output video
-
-    Raises:
-        ValidationError: If options are invalid
-        ProcessingError: If conversion fails
-    """
-    if options is None:
+    def test_validate_short_video(self):
+        """Test validation for videos under 60 seconds"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=45.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
         options = ConversionOptions()
+        is_valid, error = options.validate(video)
+        assert is_valid is True
+        assert error is None
 
-    def report_progress(value: float):
-        """Report progress to callback"""
-        if progress_callback:
-            progress_callback(min(100.0, max(0.0, value)))
-
-    try:
-        report_progress(0)
-
-        # Get video info
-        logger.info(f"Loading video: {video_path.name}")
-        video_info = get_video_info(video_path)
-        logger.info(
-            f"Video: {video_info.duration:.1f}s, {video_info.width}x{video_info.height}"
+    def test_validate_long_video_with_speed(self):
+        """Test validation for long video with speed adjustment"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=120.0, width=1920, height=1080, fps=30.0, has_audio=True
         )
+        options = ConversionOptions(speed=2.0)
+        is_valid, error = options.validate(video)
+        assert is_valid is True
+        assert error is None
 
-        # Validate options
-        is_valid, error_msg = options.validate(video_info)
-        if not is_valid:
-            raise ValidationError(error_msg)
-
-        report_progress(10)
-
-        # Load video
-        clip = VideoFileClip(str(video_path))
-
-        # Apply segment selection if needed
-        if not video_info.is_short:
-            if options.duration is not None:
-                # Segment mode
-                end_time = min(
-                    options.start_time + options.duration, video_info.duration
-                )
-                logger.info(
-                    f"Using segment: {options.start_time:.1f}s - {end_time:.1f}s"
-                )
-                clip = clip.subclip(options.start_time, end_time)
-            elif options.start_time > 0:
-                # Start from specific time
-                logger.info(f"Starting from: {options.start_time:.1f}s")
-                clip = clip.subclip(options.start_time)
-
-        report_progress(20)
-
-        # Apply speed
-        if options.speed != 1.0:
-            logger.info(f"Applying speed: {options.speed}x")
-            video_clip = clip.without_audio().fx(vfx.speedx, options.speed)
-
-            # Keep audio at original speed or adjust based on preference
-            if clip.audio:
-                audio_clip = clip.audio.fx(vfx.speedx, options.speed)
-                if options.audio_fadeout > 0:
-                    audio_clip = audio_clip.audio_fadeout(options.audio_fadeout)
-            else:
-                audio_clip = None
-        else:
-            video_clip = clip.without_audio()
-            audio_clip = clip.audio
-            if audio_clip and options.audio_fadeout > 0:
-                audio_clip = audio_clip.audio_fadeout(options.audio_fadeout)
-
-        report_progress(40)
-
-        # Apply fade effects
-        if options.video_fadeout > 0:
-            logger.info(f"Applying video fadeout: {options.video_fadeout}s")
-            video_clip = video_clip.crossfadeout(options.video_fadeout)
-
-        report_progress(50)
-
-        # Apply vertical layout
-        logger.info("Applying 9:16 layout with blurred background...")
-
-        def frame_processor(frame):
-            return apply_vertical_layout(
-                frame,
-                options.target_width,
-                options.target_height,
-                options.blur_kernel,
-                options.blur_sigma,
-                options.blur_brightness,
-                options.blur_darken,
-            )
-
-        vertical_clip = video_clip.fl_image(frame_processor)
-
-        # Add audio back
-        if audio_clip:
-            vertical_clip = vertical_clip.set_audio(audio_clip)
-
-        report_progress(60)
-
-        # Export
-        logger.info(f"Exporting to: {output_path}")
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        vertical_clip.write_videofile(
-            str(output_path),
-            codec="libx264",
-            audio_codec="aac",
-            fps=options.output_fps,
-            bitrate=options.output_bitrate,
-            preset="medium",
-            threads=4,
-            logger=None,  # Suppress moviepy logger
+    def test_validate_long_video_with_segment(self):
+        """Test validation for long video with segment"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=120.0, width=1920, height=1080, fps=30.0, has_audio=True
         )
+        options = ConversionOptions(start_time=30.0, duration=40.0)
+        is_valid, error = options.validate(video)
+        assert is_valid is True
+        assert error is None
 
-        report_progress(100)
+    def test_validate_exceeds_60_seconds(self):
+        """Test validation fails when output exceeds 60 seconds"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=120.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        options = ConversionOptions(speed=1.5)  # 120 / 1.5 = 80 seconds
+        is_valid, error = options.validate(video)
+        assert is_valid is False
+        assert "exceeds 60 seconds" in error.lower()
 
-        # Cleanup
-        clip.close()
-        vertical_clip.close()
+    def test_validate_negative_start_time(self):
+        """Test validation fails for negative start time"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=120.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        options = ConversionOptions(start_time=-10.0)
+        is_valid, error = options.validate(video)
+        assert is_valid is False
+        assert "start time" in error.lower()
 
-        logger.info(f"✓ Conversion complete: {output_path.name}")
-        return output_path
+    def test_validate_start_exceeds_duration(self):
+        """Test validation fails when start time exceeds video duration"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=60.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        options = ConversionOptions(start_time=70.0)
+        is_valid, error = options.validate(video)
+        assert is_valid is False
+        assert "exceeds video duration" in error.lower()
 
-    except ValidationError:
-        raise
-    except Exception as e:
-        logger.error(f"Conversion failed: {str(e)}")
-        raise ProcessingError(f"Failed to convert video: {str(e)}")
+    def test_validate_segment_exceeds_video(self):
+        """Test validation fails when segment exceeds video duration"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=60.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        options = ConversionOptions(start_time=50.0, duration=20.0)
+        is_valid, error = options.validate(video)
+        assert is_valid is False
+        assert "exceeds" in error.lower()
+
+    def test_validate_invalid_speed(self):
+        """Test validation fails for invalid speed"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=60.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        options = ConversionOptions(speed=0.0)
+        is_valid, error = options.validate(video)
+        assert is_valid is False
+        assert "speed" in error.lower()
+
+    def test_validate_negative_duration(self):
+        """Test validation fails for negative duration"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=60.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        options = ConversionOptions(duration=-10.0)
+        is_valid, error = options.validate(video)
+        assert is_valid is False
+        assert "duration" in error.lower()
 
 
-# Helper functions for common use cases
+class TestEdgeCases:
+    """Test edge cases and boundary conditions"""
 
+    def test_exactly_60_seconds_with_1x_speed(self):
+        """Test 60-second video at 1x speed"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=60.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
+        options = ConversionOptions(speed=1.0)
+        is_valid, error = options.validate(video)
+        assert is_valid is False  # Should fail because 60.0 is not < 60.0
 
-def auto_convert(video_path: Path, output_path: Path) -> Path:
-    """
-    Auto-convert with smart defaults
-
-    For videos under 60s: Convert as-is
-    For videos over 60s: Use 1.5x speed to fit within 60s
-
-    Args:
-        video_path: Input video path
-        output_path: Output video path
-
-    Returns:
-        Path to output video
-    """
-    video_info = get_video_info(video_path)
-
-    if video_info.is_short:
-        # Under 60 seconds: use as-is
+    def test_59_seconds_is_valid(self):
+        """Test 59-second video is valid"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=59.0, width=1920, height=1080, fps=30.0, has_audio=True
+        )
         options = ConversionOptions()
-    else:
-        # Over 60 seconds: calculate speed needed
-        required_speed = video_info.duration / 59.0  # Leave 1s margin
-        options = ConversionOptions(speed=required_speed)
-        logger.info(
-            f"Video is {video_info.duration:.1f}s, using {required_speed:.2f}x speed"
+        is_valid, error = options.validate(video)
+        assert is_valid is True
+
+    def test_very_short_video(self):
+        """Test very short video (1 second)"""
+        video = VideoInfo(
+            path=Path("test.mp4"), duration=1.0, width=1920, height=1080, fps=30.0, has_audio=True
         )
+        options = ConversionOptions()
+        is_valid, error = options.validate(video)
+        assert is_valid is True
 
-    return convert_to_shorts(video_path, output_path, options)
+    def test_extreme_speed(self):
+        """Test with extreme speed values"""
+        video = VideoInfo(
+            path=Path("test.mp4"),
+            duration=240.0,  # 4 minutes
+            width=1920,
+            height=1080,
+            fps=30.0,
+            has_audio=True,
+        )
+        options = ConversionOptions(speed=4.0)  # 240 / 4 = 60
+        is_valid, error = options.validate(video)
+        assert is_valid is False  # Exactly 60 is not valid
+
+        options = ConversionOptions(speed=4.1)  # 240 / 4.1 = 58.5
+        is_valid, error = options.validate(video)
+        assert is_valid is True
 
 
-def convert_segment(
-    video_path: Path, output_path: Path, start: float, duration: float
-) -> Path:
-    """
-    Convert a specific segment of video
-
-    Args:
-        video_path: Input video path
-        output_path: Output video path
-        start: Start time in seconds
-        duration: Duration in seconds
-
-    Returns:
-        Path to output video
-    """
-    options = ConversionOptions(start_time=start, duration=duration)
-    return convert_to_shorts(video_path, output_path, options)
-
-
-def convert_with_speed(video_path: Path, output_path: Path, speed: float) -> Path:
-    """
-    Convert video with specified speed
-
-    Args:
-        video_path: Input video path
-        output_path: Output video path
-        speed: Speed multiplier (e.g., 1.5 for 1.5x speed)
-
-    Returns:
-        Path to output video
-    """
-    options = ConversionOptions(speed=speed)
-    return convert_to_shorts(video_path, output_path, options)
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
